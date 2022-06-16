@@ -2,7 +2,7 @@
 , lib
 , fetchFromGitHub
 , which
-, go
+, go_1_18
 , makeWrapper
 , rsync
 , installShellFiles
@@ -21,16 +21,16 @@
 
 stdenv.mkDerivation rec {
   pname = "kubernetes";
-  version = "1.23.7";
+  version = "1.24.1";
 
   src = fetchFromGitHub {
     owner = "kubernetes";
     repo = "kubernetes";
     rev = "v${version}";
-    sha256 = "sha256-YHlcopB47HVLO/4QI8HxjMBzCpcHVnlAz3EOmZI+EG8=";
+    sha256 = "sha256-Sia0bM121IWLTFSacs0cNqiqKtsdfG6jV597bNk4raI=";
   };
 
-  nativeBuildInputs = [ makeWrapper which go rsync installShellFiles ];
+  nativeBuildInputs = [ makeWrapper which go_1_18 rsync installShellFiles ];
 
   outputs = [ "out" "man" "pause" ];
 
@@ -80,7 +80,7 @@ stdenv.mkDerivation rec {
     runHook postInstall
   '';
 
-  disallowedReferences = [ go ];
+  disallowedReferences = [ go_1_18 ];
 
   GOFLAGS = [ "-trimpath" ];
 
