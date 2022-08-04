@@ -46,15 +46,13 @@ let
     toList
     ;
 
-  mkDbExtraCommand = contents:
+  mkDbExtraCommand = layerContents: propagatedContents:
     let
-      contentsList = if builtins.isList contents then contents else [ contents ];
+      layerContentsList = if builtins.isList layerContents then layerContents else [ layerContents ];
+      contentsList = lib.lists.unique (layerContentsList ++ propagatedContents);
     in
     ''
       echo "Generating the nix database..."
-      echo "Warning: only the database of the deepest Nix layer is loaded."
-      echo "         If you want to use nix commands in the container, it would"
-      echo "         be better to only have one layer that contains a nix store."
 
       export NIX_REMOTE=local?root=$PWD
       # A user is required by nix
@@ -63,7 +61,7 @@ let
       ${buildPackages.nix}/bin/nix-store --load-db < ${closureInfo {rootPaths = contentsList;}}/registration
 
       mkdir -p nix/var/nix/gcroots/docker/
-      for i in ${lib.concatStringsSep " " contentsList}; do
+      for i in ${lib.concatStringsSep " " layerContentsList}; do
       ln -s $i nix/var/nix/gcroots/docker/$(basename $i)
       done;
     '';
@@ -479,7 +477,7 @@ rec {
     runCommand "${baseNameOf name}.tar.gz"
       {
         inherit (stream) imageName;
-        passthru = { inherit (stream) imageTag; };
+        passthru = { inherit (stream) imageTag; } // stream.passthru;
         nativeBuildInputs = [ pigz ];
       } "${stream} | pigz -nT > $out";
 
@@ -789,18 +787,29 @@ rec {
   # Build an image and populate its nix database with the provided
   # contents. The main purpose is to be able to use nix commands in
   # the container.
-  # Be careful since this doesn't work well with multilayer.
   # TODO: add the dependencies of the config json.
-  buildImageWithNixDb = args@{ copyToRoot ? contents, contents ? null, extraCommands ? "", ... }: (
+  buildImageWithNixDb = args@{ copyToRoot ? contents, contents ? [], extraCommands ? "", passthru ? {}, ... }: (
+    let propagatedContents = lib.attrsets.attrByPath [ "fromImage" "propagatedContents" ] [] args;
+    in
+
     buildImage (args // {
-      extraCommands = (mkDbExtraCommand copyToRoot) + extraCommands;
+      extraCommands = (mkDbExtraCommand copyToRoot propagatedContents) + extraCommands;
+      passthru = passthru // {
+        propagatedContents = lib.lists.unique (contents ++ propagatedContents);
+      };
     })
   );
 
   # TODO: add the dependencies of the config json.
-  buildLayeredImageWithNixDb = args@{ contents ? null, extraCommands ? "", ... }: (
+  buildLayeredImageWithNixDb = args@{ contents ? [], extraCommands ? "", passthru ? {}, ... }: (
+    let propagatedContents = lib.attrsets.attrByPath [ "fromImage" "propagatedContents" ] [] args;
+    in
+
     buildLayeredImage (args // {
-      extraCommands = (mkDbExtraCommand contents) + extraCommands;
+      extraCommands = (mkDbExtraCommand contents propagatedContents) + extraCommands;
+      passthru = passthru // {
+        propagatedContents = lib.lists.unique (contents ++ propagatedContents);
+      };
     })
   );
 
