@@ -31962,6 +31962,8 @@ with pkgs;
     inherit buildPythonApplication;
   };
 
+  foundry = callPackage ../applications/blockchains/foundry { };
+
   foxotron = callPackage ../applications/graphics/foxotron {
     inherit (darwin.apple_sdk.frameworks) AVFoundation Carbon Cocoa CoreAudio Kernel OpenGL;
   };
